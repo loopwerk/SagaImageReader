@@ -1,0 +1,9 @@
+import Saga
+
+public extension Reader {
+  static var imageReader: Self {
+    Reader(supportedExtensions: ["jpg", "jpeg", "png", "webp", "gif"], copySourceFiles: true) { absoluteSource in
+      return (title: absoluteSource.lastComponentWithoutExtension, body: "", frontmatter: nil)
+    }
+  }
+}
