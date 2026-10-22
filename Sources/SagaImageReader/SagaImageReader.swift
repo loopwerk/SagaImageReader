@@ -84,6 +84,11 @@ private func readImageMetadata(from path: String) -> [String: String]? {
     return nil
   }
 
+  return frontmatter(from: properties)
+}
+
+/// Converts Scry's metadata into Saga frontmatter
+func frontmatter(from properties: [String: Any]) -> [String: String]? {
   var result: [String: String] = [:]
 
   for (key, value) in properties {
@@ -105,7 +110,41 @@ private func readImageMetadata(from path: String) -> [String: String]? {
     }
   }
 
+  // Use the capture date as Saga's item date, including the time and (if known) the time zone
+  for (dateKey, offsetKey) in dateKeys {
+    if let exifDate = result[dateKey], let date = sagaDate(fromExifDate: exifDate, offset: result[offsetKey]) {
+      result["date"] = date
+      break
+    }
+  }
+
   return result.isEmpty ? nil : result
+}
+
+/// EXIF dates in order of preference, with their matching time zone offsets
+private let dateKeys = [
+  ("dateTimeOriginal", "offsetTimeOriginal"),
+  ("dateTimeDigitized", "offsetTimeDigitized"),
+  ("dateTime", "offsetTime"),
+]
+
+/// Converts "2026:01:05 17:11:42" with offset "+01:00" → "2026-01-05 17:11:42+01:00".
+/// Returns nil for unset dates like "0000:00:00 00:00:00" or blanks, which Saga would fail to parse.
+func sagaDate(fromExifDate exifDate: String, offset: String?) -> String? {
+  guard exifDate.range(of: #"^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}$"#, options: .regularExpression) != nil,
+        !exifDate.hasPrefix("0000")
+  else {
+    return nil
+  }
+
+  let parts = exifDate.split(separator: " ")
+  let date = parts[0].replacingOccurrences(of: ":", with: "-") + " " + parts[1]
+
+  if let offset, offset.range(of: #"^[+-]\d{2}:\d{2}$"#, options: .regularExpression) != nil {
+    return date + offset
+  }
+
+  return date
 }
 
 private let keyRenames = [

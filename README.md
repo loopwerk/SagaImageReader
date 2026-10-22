@@ -38,7 +38,7 @@ try await Saga(input: "content", output: "deploy")
   .run()
 ```
 
-The `.imageReader` reads image files and extracts EXIF metadata as frontmatter.
+The `.imageReader` reads image files and extracts EXIF metadata as frontmatter. The capture date (`DateTimeOriginal`, including the time and time zone when the image has them) becomes the item's `date`.
 
 ## ImageMetadata
 
