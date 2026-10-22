@@ -4,13 +4,17 @@ import Scry
 
 // MARK: - ImageMetadata
 
-/// A ready-made Metadata type for images with common EXIF, TIFF, and GPS fields.
-/// All properties are optional since not every image contains every field.
+/// A ready-made Metadata type for images with the image size and common EXIF, TIFF, and GPS fields.
+/// All EXIF properties are optional since not every image contains every field.
 public struct ImageMetadata: Metadata {
+  // MARK: Dimensions
+
+  /// The displayed size, read from the image header and corrected for the EXIF orientation.
+  public let imageWidth: Int
+  public let imageHeight: Int
+
   // MARK: Image info
 
-  public let imageWidth: Int?
-  public let imageLength: Int?
   public let orientation: Int?
   public let make: String?
   public let model: String?
@@ -42,11 +46,6 @@ public struct ImageMetadata: Metadata {
   public let meteringMode: Int?
   public let sceneCaptureType: Int?
 
-  // MARK: Dimensions
-
-  public let pixelXDimension: Int?
-  public let pixelYDimension: Int?
-
   // MARK: Dates
 
   public let dateTimeOriginal: String?
@@ -70,8 +69,8 @@ public struct ImageMetadata: Metadata {
 
 public extension Reader {
   static var imageReader: Self {
-    Reader(supportedExtensions: ["jpg", "jpeg", "png", "webp", "tiff", "tif"], copySourceFiles: true) { absoluteSource in
-      let frontmatter = readImageMetadata(from: absoluteSource.string)
+    Reader(supportedExtensions: ["jpg", "jpeg", "png", "webp"], copySourceFiles: true) { absoluteSource in
+      let frontmatter = try readImageMetadata(from: absoluteSource.string)
       return (title: absoluteSource.lastComponentWithoutExtension, body: "", frontmatter: frontmatter)
     }
   }
@@ -79,34 +78,32 @@ public extension Reader {
 
 // MARK: - Metadata extraction
 
-private func readImageMetadata(from path: String) -> [String: String]? {
-  guard let properties = try? Scry.metadata(fromFileAt: path) else {
-    return nil
-  }
-
-  return frontmatter(from: properties)
+private func readImageMetadata(from path: String) throws -> [String: String] {
+  let dimensions = try Scry.dimensions(fromFileAt: path)
+  let properties = (try? Scry.metadata(fromFileAt: path)) ?? [:]
+  return frontmatter(from: properties, dimensions: dimensions)
 }
 
-/// Converts Scry's metadata into Saga frontmatter
-func frontmatter(from properties: [String: Any]) -> [String: String]? {
+/// Converts Scry's metadata and the image size into Saga frontmatter
+func frontmatter(from properties: [String: Any], dimensions: (width: Int, height: Int)) -> [String: String] {
   var result: [String: String] = [:]
 
-  for (key, value) in properties {
+  for (key, value) in properties where !exifDimensionKeys.contains(key) {
     let frontmatterKey = lowercasedFirst(key)
     let renamedKey = keyRenames[frontmatterKey] ?? frontmatterKey
 
     switch value {
-    case let array as [Double]:
-      // GPS coordinates: convert [degrees, minutes, seconds] to decimal
-      let decimal = array.count == 3
-        ? array[0] + array[1] / 60.0 + array[2] / 3600.0
-        : array[0]
-      result[renamedKey] = "\(decimal)"
-    case let array as [Any]:
-      let elements = array.map { "\($0)" }
-      result[renamedKey] = elements.joined(separator: ", ")
-    default:
-      result[renamedKey] = "\(value)"
+      case let array as [Double]:
+        // GPS coordinates: convert [degrees, minutes, seconds] to decimal
+        let decimal = array.count == 3
+          ? array[0] + array[1] / 60.0 + array[2] / 3600.0
+          : array[0]
+        result[renamedKey] = "\(decimal)"
+      case let array as [Any]:
+        let elements = array.map { "\($0)" }
+        result[renamedKey] = elements.joined(separator: ", ")
+      default:
+        result[renamedKey] = "\(value)"
     }
   }
 
@@ -118,8 +115,20 @@ func frontmatter(from properties: [String: Any]) -> [String: String]? {
     }
   }
 
-  return result.isEmpty ? nil : result
+  // Orientations 5 to 8 rotate the image by 90°, so the displayed width is the stored height
+  let isRotated = (5 ... 8).contains(properties["Orientation"] as? Int ?? 1)
+  let (width, height) = isRotated ? (dimensions.height, dimensions.width) : dimensions
+
+  // Saga frontmatter is all strings
+  result["imageWidth"] = String(width)
+  result["imageHeight"] = String(height)
+
+  return result
 }
+
+/// The size as written into the metadata by the exporting app, which can be missing or out of date.
+/// The size from the image header is used instead.
+private let exifDimensionKeys: Set = ["ImageWidth", "ImageLength", "PixelXDimension", "PixelYDimension"]
 
 /// EXIF dates in order of preference, with their matching time zone offsets
 private let dateKeys = [

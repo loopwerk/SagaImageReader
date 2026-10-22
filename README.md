@@ -1,6 +1,6 @@
 # SagaImageReader
 
-An image reader for [Saga](https://github.com/loopwerk/Saga) that turns images into Items with EXIF metadata. Supports JPEG, PNG, WebP, and TIFF.
+An image reader for [Saga](https://github.com/loopwerk/Saga) that turns images into Items with EXIF metadata. Supports JPEG, PNG, and WebP.
 
 Uses [Scry](https://github.com/loopwerk/Scry) for cross-platform EXIF parsing — works on both macOS and Linux.
 
@@ -38,11 +38,13 @@ try await Saga(input: "content", output: "deploy")
   .run()
 ```
 
-The `.imageReader` reads image files and extracts EXIF metadata as frontmatter. The capture date (`DateTimeOriginal`, including the time and time zone when the image has them) becomes the item's `date`.
+The `.imageReader` reads image files and extracts dimensions and EXIF metadata as frontmatter. The capture date becomes the item's `date`.
 
 ## ImageMetadata
 
 SagaImageReader ships with `ImageMetadata`, a ready-made `Metadata` type with all common EXIF fields as optionals — camera info, lens, exposure settings, GPS coordinates, dates, and more.
+
+Every image also gets `imageWidth` and `imageHeight`, which are the displayed size: for a photo with an EXIF orientation that rotates it by 90°, width and height are swapped.
 
 You can also define your own metadata struct with just the fields you need:
 

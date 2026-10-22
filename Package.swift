@@ -14,8 +14,8 @@ let package = Package(
     ),
   ],
   dependencies: [
-    .package(url: "https://github.com/loopwerk/Saga.git", "3.8.0"..<"4.0.0"),
-    .package(url: "https://github.com/loopwerk/Scry.git", from: "1.0.0"),
+    .package(url: "https://github.com/loopwerk/Saga.git", "3.8.0" ..< "4.0.0"),
+    .package(url: "https://github.com/loopwerk/Scry.git", from: "1.3.0"),
   ],
   targets: [
     .target(
